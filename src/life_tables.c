@@ -23,7 +23,7 @@ double sum(double *x, int dim) {
  *****************************************************************************/
 double * get_a05(double mx0, int sex) {
 	static double ax[2];
-	if(sex > 1) {/* female*/
+	if(sex == 2) {/* female*/
 		if (mx0 < 0.107) {
 			ax[0] = 0.053 + 2.8 * mx0;      /*1a0*/
 			ax[1] = 1.522 - 1.518 * mx0;    /*4a1*/
@@ -31,17 +31,28 @@ double * get_a05(double mx0, int sex) {
 			ax[0] = 0.35;
 			ax[1] = 1.361;
 		}
-	} else { /* male */
-		if (mx0 < 0.107) {
-			ax[0] = 0.045 + 2.684 * mx0;
-			ax[1] = 1.651 - 2.816 * mx0;
-		} else {
-			ax[0] = 0.33;
-			ax[1] = 1.352;
-		}
+	} else { 
+	    if(sex == 1) { /* male */
+		    if (mx0 < 0.107) {
+			    ax[0] = 0.045 + 2.684 * mx0;
+			    ax[1] = 1.651 - 2.816 * mx0;
+		    } else {
+			    ax[0] = 0.33;
+			    ax[1] = 1.352;
+		    }
+	    } else { /* total */
+            if (mx0 < 0.107) {
+                ax[0] = 0.049 + 2.742 * mx0;
+                ax[1] = 1.5865 - 2.167 * mx0;
+            } else {
+                ax[0] = 0.34;
+                ax[1] = 1.3565;
+            }
+	    }
 	}
 	return(ax);
 }
+
 /*****************************************************************************
  * Function calculates an abridged life table from age-specific mortality 
  * rates
@@ -89,7 +100,7 @@ void doLifeTable(int sex, int nage, double *mx,
 		ax[i] = 2.5 - (25 / 12.0) * (mx[i] - k);
 	}
 	/* penultimate ax calculated with k from previous age group */
-	ax[nage1] = 2.5 - (25 / 12.0) * (mx[i] - k);
+	ax[nage1] = 2.5 - (25 / 12.0) * (mx[nage1 - 1] - k);
 
 	/* correcting out-of (reasonable) bounds ax for older ages             */ 
 	/* 0.97=1-5*exp(-5)/(1-exp(-5)), for constant mu=1, Kannisto assumption*/
@@ -114,6 +125,108 @@ void doLifeTable(int sex, int nage, double *mx,
 	ax[nage] = Lx[nage];
 }
 
+/*****************************************************************************
+ * Function calculates a life table for one-year age groups 
+ * from age-specific mortality 
+ *****************************************************************************/
+void doLifeTable1y(int sex, int nage, double *mx, 
+                 double *Lx, double *lx, double *qx, double *ax) {
+    
+    int i;
+    double k;     /* correcting factor in Greville approximation */
+    double *tmpa; /* pointer to estimated ax[0] and ax[1] values */
+    int nage1;
+    nage1 = nage -1;
+
+    tmpa = get_a05(mx[0], sex); 
+    ax[0] = tmpa[0]; /* use only ax[0] */
+
+    for(i = 1; i < nage1; ++i) {
+        k = 0.5 * log(fmax(mx[i+1] / fmax(mx[i-1], DBL_MIN), DBL_MIN));
+        ax[i] = 0.5 - (1 / 12.0) * (mx[i] - k);
+    }
+    /* penultimate ax calculated with k from previous age group */
+    ax[nage1] = 0.5 - (1 / 12.0) * (mx[nage1 - 1] - k);
+    
+    /* correcting out-of (reasonable) bounds ax for older ages             */ 
+    /* 0.42=1-exp(-1)/(1-exp(-1)), for constant mu=1, Kannisto assumption*/
+    /*for(i = 10; i < nage; i++) {
+        if(ax[i] < 0.97) {
+            ax[i] = 0.97;
+        }
+    }*/
+    
+    lx[0] = 1;       /* l0 */
+    
+    /* caculate life table variables from mx and ax */
+    for(i = 0; i < nage; ++i) {
+        qx[i] = mx[i] / (1 + (1 - ax[i]) * mx[i]);
+        lx[i+1] = fmax(lx[i] * (1-qx[i]), DBL_MIN);
+        Lx[i] = lx[i+1] + ax[i] * (lx[i] - lx[i+1]);
+    }
+			
+    /* Open ended age interval */
+    Lx[nage] = lx[nage] / fmax(mx[nage], DBL_MIN); 
+    qx[nage] = 1.0;
+    ax[nage] = Lx[nage];
+}
+
+void LTextraColumns(int nx, int nage, double *lx, double *Lx, 
+                    double *dx, double *Tx, double *sx) {
+    /* calculating additional life table columns dx, Tx, sx */
+    int i;
+    
+    /* dx */
+    for(i = 0; i < nage; ++i) {
+        dx[i] = lx[i] - lx[i+1];
+    }
+    dx[nage] = lx[nage];
+    
+    /* Tx */
+    Tx[nage] = Lx[nage];
+    for (i = nage-1; i >= 0; i--) {
+        Tx[i] = Tx[i+1] + Lx[i];
+    }       
+    /* sx */
+    /* first age group is survival from births to the second age group */
+    sx[0] = (Lx[0] + Lx[1]) / nx*lx[0];
+    
+    if(nx > 1) {
+        /* second age group is survival age 0-5 to age 5 - 10 */
+        sx[1] = Lx[2] / (Lx[0] + Lx[1]);
+    } else {
+        sx[1] = Lx[2] / Lx[1];
+    }
+    /* middle age groups  */
+    for(i = 2; i < nage-1; ++i) {
+        sx[i] = Lx[i+1] / Lx[i];
+    }
+    /* last but one age group */
+    sx[nage-1] = Lx[nage] / (Lx[nage-1]+Lx[nage]);
+    sx[nage]= 0.0;
+}
+
+/*****************************************************************************
+ * Wrapper for abridged life table function
+ *****************************************************************************/
+
+void LifeTableAbridged(int *sex, int *nage, double *mx, 
+               double *Lx, double *lx, double *qx, double *ax, double *Tx, double *sx, double *dx) {
+
+    doLifeTable(*sex, *nage, mx, Lx, lx, qx, ax);
+    LTextraColumns(5, *nage, lx, Lx, dx, Tx, sx);
+}
+
+/*****************************************************************************
+ * Wrapper for 1-year-age-groups life table function
+ *****************************************************************************/
+
+void LifeTable(int *sex, int *nage, double *mx, 
+                       double *Lx, double *lx, double *qx, double *ax, double *Tx, double *sx, double *dx) {
+
+    doLifeTable1y(*sex, *nage, mx, Lx, lx, qx, ax);
+    LTextraColumns(1, *nage, lx, Lx, dx, Tx, sx);
+}
 
 
 /* Function returns collapsed Lx and lx columns of life table */
@@ -232,21 +345,25 @@ void LC(int *Npred, int *Sex, int *Nage, double *ax, double *bx,
 		double *Eop, double *Kl, double *Ku, int *constrain, double *FMx, double *FEop, 
 		double *LLm, double *Sr, double *lx, double *Mx) {
 	double eop, sx[*Nage-1], Lm[*Nage-1], mxm[*Nage], fmx[*Nage], lm[*Nage], locbx[*Nage], locax[*Nage];
-	int i, sex, npred, pred, nage, nagem1;
+	int i, sex, npred, pred, nage, nagem1, cage;
 	
 	npred = *Npred;
 	sex=*Sex;
 	nage=*Nage;
 	nagem1 = nage-1;
+	cage = -1;
+	
+	if(*constrain == 1) cage = 22; /* constrain old ages only */ 
+	if(*constrain == 2) cage = 0;  /* constrain all ages */
 	
 	for (i=0; i < nage; ++i) fmx[i] = -1;
 	for (pred=0; pred < npred; ++pred) {
 		eop = Eop[pred];
-		if(*constrain > 0 && nage > 22) {		
+		if(*constrain > 0 && nage > cage) {		
 			if(FEop[pred] > eop) {
-				for (i=22; i < nage; ++i) {fmx[i] = FMx[i + pred*nage];}
+				for (i=cage; i < nage; ++i) {fmx[i] = FMx[i + pred*nage];}
 			} else {
-				for (i=22; i < nage; ++i) {fmx[i] = -1;}
+				for (i=cage; i < nage; ++i) {fmx[i] = -1;}
 			}
 		}
 		for (i=0; i < nage; ++i) {
@@ -269,5 +386,61 @@ void LC(int *Npred, int *Sex, int *Nage, double *ax, double *bx,
 			LLm[i + pred*(nagem1)] = Lm[i];
 		}
 	}
+}
+
+/*****************************************************************************
+ * PMD model
+ * Produces a projection of age-specific mortality rates
+ * 
+ *****************************************************************************/
+void PMD(int *Npred, int *Sex, int *Nage, double *mx0, double *rho, 
+        double *Eop, double *Kl, double *Ku, double *Constr, int *Nconstr,
+        double *LLm, double *Sr, double *lx, double *Mx) {
+    double eop, sx[*Nage-1], Lm[*Nage-1], mxm[*Nage], lm[*Nage], locrho[*Nage], locmx[*Nage], constr[*Nage];
+    int i, sex, npred, pred, nage, nagem1, nconstr;
+    
+    npred = *Npred;
+    sex=*Sex;
+    nage=*Nage;
+    nagem1 = nage-1;
+    nconstr = *Nconstr;
+    
+    for (i=0; i < nage; ++i) {
+        locmx[i] = log(mx0[i]);
+    }
+    for (pred=0; pred < npred; ++pred) {
+        eop = Eop[pred];
+        for (i=0; i < nage; ++i) {
+            locrho[i] = -rho[i + pred*nage];
+            constr[i] = -1;
+        }
+        if(nconstr > 0) {
+            for(i=0; i < nconstr; ++i) {
+                constr[i] = Constr[i + pred*nconstr];
+            }
+        }
+
+        /*Rprintf("\nconstr: sex %i period %i: ", sex, pred);
+        for (i=0; i < nage; ++i) 
+            Rprintf("%lf, ", i+1, constr[i]);*/
+        
+        /*Rprintf("\n%i: eop=%lf", pred, eop);*/
+        LCEoKtC(sex, nage, locmx, locrho, eop, Kl[0], Ku[0], constr, Lm, lm, mxm);		
+        get_sx(Lm, sx, nagem1, nagem1);
+        
+        for (i=0; i < nagem1; ++i) {
+            Sr[i + pred*(nagem1)] = sx[i];
+            /*Rprintf("\nLLm=%lf, Sr=%lf", LLm[i], Sr[i + pred*27]);*/
+            Mx[i + pred*nage] = mxm[i];
+            lx[i + pred*nage] = lm[i];
+            locmx[i] = log(mxm[i]);
+        }
+        Mx[nagem1 + pred*nage] = mxm[nagem1];
+        lx[nagem1 + pred*nage] = lm[nagem1];
+        locmx[nagem1] = log(mxm[nagem1]);
+        for (i=0; i < nage-2; ++i) {
+            LLm[i + pred*(nagem1)] = Lm[i];
+        }
+    }
 }
 
