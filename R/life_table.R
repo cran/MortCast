@@ -1,6 +1,9 @@
 #' @title Life Table Function
 #' @description Function for obtaining life table quantities from mortality rates.
-#' @details Computes a life table corresponding to given mortality rates for either 5- or 1-year age groups. 
+#' @details Computes a life table corresponding to given mortality rates for either 5- or 1-year age groups. The implementation follows
+#'    Preston et al. (2001), including the choice of ax (see Table 3.3 on page 48). 
+#'    For compatibility with computations done at the UN, we set ax for ages 5 and 10 
+#'    (in the abridged version) to 2.5.
 #' @param mx Vector of age-specific mortality rates nmx. If \code{abridged} is \code{TRUE} (default), 
 #'    the elements correspond to 1m0, 4m1, 5m5, 5m10, \dots. 
 #'    If \code{abridged} is \code{FALSE}, they correspond to 1m0, 1m1, 1m2, 1m3, \dots.
@@ -11,6 +14,8 @@
 #' @param radix Base of the life table.
 #' @param open.age Open age group. If smaller than the last age group of \code{mx}, the life table is truncated. 
 #'    It does not have any effect if larger than the last age group.
+#' @references 
+#'    Preston, S.H., Heuveline, P., Guillot, M. (2001). Demography: Measuring and Modeling Population Processes. Oxford: Blackwell Publishers Ltd.
 #' @export
 #' @examples
 #' data(mxF, e0Fproj, package = "wpp2017")
@@ -19,11 +24,11 @@
 #' mxf <- subset(mxF, name == country)[,"2010-2015"]
 #' life.table(mxf, sex = "female")
 #' 
-life.table <- function(mx, sex = c("male", "female", "both"), abridged = TRUE, radix = 1, open.age = 130){
+life.table <- function(mx, sex = c("male", "female", "total"), abridged = TRUE, radix = 1, open.age = 130){
     # The first two elements of mx must correspond to 0-1 and 1-4. 
     # If include01 is FALSE, the first two age groups of the results are collapsed to 0-5
     sex <- match.arg(sex)
-    sex <- list(male=1, female=2, both=3)[[sex]]
+    sex <- list(male=1, female=2, total=3)[[sex]]
     if(abridged) {
         ages <- c(0, 1, seq(5, length = length(mx)-2, by = 5))
         LTfct <- "LifeTableAbridged"

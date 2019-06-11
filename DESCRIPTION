@@ -1,8 +1,8 @@
 Package: MortCast
 Type: Package
 Title: Estimation and Projection of Age-Specific Mortality Rates
-Version: 2.0-1
-Date: 2019-03-19
+Version: 2.1-1
+Date: 2019-06-10
 Author: Hana Sevcikova, Nan Li and Patrick Gerland
 Maintainer: Hana Sevcikova <hanas@uw.edu>
 Description: Age-specific mortality rates are estimated and projected using 
@@ -11,7 +11,9 @@ Description: Age-specific mortality rates are estimated and projected using
 License: GPL (>= 2)
 Depends: wpp2017
 RoxygenNote: 6.1.1
+LazyLoad: True
+LazyData: True
 NeedsCompilation: yes
-Packaged: 2019-03-19 21:20:02 UTC; hana
+Packaged: 2019-06-11 16:23:04 UTC; hana
 Repository: CRAN
-Date/Publication: 2019-03-19 21:43:53 UTC
+Date/Publication: 2019-06-11 16:40:03 UTC
