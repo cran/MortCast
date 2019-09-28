@@ -1,5 +1,5 @@
-80869fef90dab945d6e9e24053818416 *ChangeLog
-2ea94f365ad9db610edf96c5be6ad92f *DESCRIPTION
+33987fa7e28c23d0fa9fd03d8e0a1c0c *ChangeLog
+4546cee2c60d53c26eaf06143c9338a7 *DESCRIPTION
 691f0dc993c3e19d0fda23a0aef687b0 *NAMESPACE
 b18594991864099a4db5105c7bdb97ae *R/LC.R
 6b79fcb3337a5cbe366f9a45e94913d1 *R/MortCast-data.R
@@ -7,7 +7,7 @@ b18594991864099a4db5105c7bdb97ae *R/LC.R
 6804a09b5894c99001a1b5146a3ad00f *R/kannisto.R
 262a66599b1c40bad2da60d5331d76a9 *R/life_table.R
 0c9bd007a3fcb96db755bfd7c3875ce5 *R/other_methods.R
-01c75da76e6c0f8dc51d00fc3943d360 *build/partial.rdb
+e2a02069050f0c4b60430a4ea8b1a3f9 *build/partial.rdb
 91c5e4550bf12f3969836615aaa15aff *data/LQcoef.rda
 4831eb7468a8ce0a3733abe6adf96b29 *data/MLTlookup.rda
 93add7fcc6847823967bc07a31044d0c *data/PMDadjcoef.rda
@@ -32,4 +32,4 @@ a45678c64332eb7a2675c8ff22e338fb *man/mortcast.blend.Rd
 adae71fb21a62ba9795c856c83d1786c *man/pmdgroup.Rd
 a364462e72739d790c3cec45d3d5d437 *man/rotate.leecarter.Rd
 f18392a1e1b904f2afb445d2fa27fa59 *src/init.c
-9115c3fbeb3d37c80b6cede9f11935de *src/life_tables.c
+52369079f1ea4a82176113df07d2ed6d *src/life_tables.c
