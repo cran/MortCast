@@ -1,7 +1,7 @@
 #' @title Life Table Function
 #' @description Function for obtaining life table quantities from mortality rates.
 #' @details Computes a life table corresponding to given mortality rates for either 5- or 1-year age groups. The implementation follows
-#'    Preston et al. (2001), including the choice of ax (see Table 3.3 on page 48). 
+#'    Preston et al. (2001). 
 #' @param mx Vector of age-specific mortality rates nmx. If \code{abridged} is \code{TRUE} (default), 
 #'    the elements correspond to 1m0, 4m1, 5m5, 5m10, \dots. 
 #'    If \code{abridged} is \code{FALSE}, they correspond to 1m0, 1m1, 1m2, 1m3, \dots.
@@ -9,6 +9,8 @@
 #' @param abridged Is it an abridged life table (\code{TRUE}, default) or not (\code{FALSE}). 
 #'    In the former case, the \code{mx} vector is interpreted as corresponding to age groups 0, 1-4, 5-9, 10-14, \dots.
 #'    If \code{FALSE}, the \code{mx} vector is interpreted as corresponding to one-year age groups, i.e. 0, 1, 2, 3, \dots.
+#' @param a0rule Rule for approximation of a0. "ak" (default) uses the Andreev-Kingkade method (Andreev and Kingkade, 2015), "cd" uses the 
+#'    Coale-Demeany method.  
 #' @param radix Base of the life table.
 #' @param open.age Open age group. If smaller than the last age group of \code{mx}, the life table is truncated. 
 #'    It does not have any effect if larger than the last age group.
@@ -25,12 +27,17 @@
 #'                 is the survival from age 0-4 to age 5-9, third row has the survival from 5-9 to 10-14 etc.}
 #'       \item{Tx}{Person-years lived after age x.}
 #'       \item{ex}{Life expectancy at age x.}
-#'       \item{ax}{Average person-years lived in the interval by those dying in the interval. For young ages, it follows Preston et al. (2001), Table 3.3 on page 48.
+#'       \item{ax}{Average person-years lived in the interval by those dying in the interval. For young ages, 
+#'                 it follows Preston et al. (2001), Table 3.3 on page 48. If \code{a0rule} is "ak" (default) 
+#'                 the Andreev-Kingkade method is used for a0. 
 #'                 For compatibility with computations done at the UN, we set ax for ages 5 and 10 in the abridged version
 #'                 to 2.5. For an unabridged life table, ax is set to 0.5 for all but first and last age groups.}
 #' }
 #' @references 
 #'    Preston, S.H., Heuveline, P., Guillot, M. (2001). Demography: Measuring and Modeling Population Processes. Oxford: Blackwell Publishers Ltd.
+#'    
+#'    Andreev, E.M. and Kingkade, W.W. (2015). \href{https://www.demographic-research.org/volumes/vol33/13/33-13.pdf}{Average age at death in infancy and infant mortality level: Reconsidering the Coale-Demeny formulas at current levels of low mortality.}
+#'    Demographic Research, 33(13), p.363-390. DOI: 10.4054/DemRes.2015.33.13
 #' @export
 #' @examples
 #' data(mxF, e0Fproj, package = "wpp2017")
@@ -39,11 +46,12 @@
 #' mxf <- subset(mxF, name == country)[,"2010-2015"]
 #' life.table(mxf, sex = "female")
 #' 
-life.table <- function(mx, sex = c("male", "female", "total"), abridged = TRUE, radix = 1, open.age = 130){
+life.table <- function(mx, sex = c("male", "female", "total"), abridged = TRUE, a0rule = c("ak", "cd"), 
+                       radix = 1, open.age = 130){
     # If abridged is TRUE, the first two elements of mx must correspond to 0-1 and 1-4. 
-    # If include01 is FALSE, the first two age groups of the results are collapsed to 0-5
     sex <- match.arg(sex)
     sex <- list(male=1, female=2, total=3)[[sex]]
+    a0cat <- list(ak = 1, cd = 2)[[match.arg(a0rule)]]
     if(abridged) {
         ages <- c(0, 1, seq(5, length = length(mx)-2, by = 5))
         LTfct <- "LifeTableAbridged"
@@ -64,7 +72,7 @@ life.table <- function(mx, sex = c("male", "female", "total"), abridged = TRUE, 
         return(data.frame(age=resage, mx=mx[1:nresage], qx=nas, lx=nas, dx=nas, Lx=nas, 
                           sx=nas, Tx=nas, ex=nas, ax=nas))
     
-    LTC <- do.call(".C", list(LTfct, as.integer(sex), as.integer(nagem1), as.numeric(mx), 
+    LTC <- do.call(".C", list(LTfct, as.integer(sex), as.integer(nagem1), as.numeric(mx), as.integer(a0cat),
               Lx=Lx, lx=lx, qx=qx, ax=ax, Tx=Tx, sx=sx, dx=dx, PACKAGE = "MortCast"))
     LT <- data.frame(age=as.integer(ages), mx=mx, qx=LTC$qx, lx=LTC$lx, dx=LTC$dx, Lx=LTC$Lx,  sx=LTC$sx, Tx=LTC$Tx, 
                      ex=LTC$Tx/LTC$lx, ax=LTC$ax)

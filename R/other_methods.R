@@ -38,7 +38,7 @@
 #' @seealso \code{\link{mortcast}}, \code{\link{mortcast.blend}}, \code{\link{PMDrho}}
 #' @references
 #' Andreev, K., Gu, D., Gerland, P. (2013). Age Patterns of Mortality Improvement by Level of Life Expectancy at Birth with Applications to Mortality Projections. Paper presented at the Annual Meeting
-#' of the Population Association of America, New Orleans, LA. \url{http://paa2013.princeton.edu/papers/132554}.
+#' of the Population Association of America, New Orleans, LA. \url{https://paa2013.princeton.edu/papers/132554}.
 #' 
 #' Gu, D., Pelletier, F., Sawyer, C. (2017). Projecting Age-sex-specific Mortality: A Comparison of the Modified Lee-Carter and Pattern of Mortality Decline Methods, UN Population Division, 
 #' Technical Paper No. 6. New York: United Nations. \url{https://population.un.org/wpp/Publications/Files/WPP2017_TechnicalPaperNo6.pdf}
@@ -61,7 +61,7 @@
 #' @rdname pmdgroup
 
 pmd <- function(e0, mx0, sex = c("male", "female"), nx = 5, interp.rho = FALSE,
-                kranges = c(0, 25), keep.lt = FALSE, keep.rho = FALSE) {
+                kranges = c(0, 25), keep.lt = FALSE, keep.rho = FALSE, ...) {
     sex <- match.arg(sex)
     if(length(dim(e0)) > 0) e0 <- drop(as.matrix(e0)) # if it's a data.frame, it would not drop dimension without as.matrix
     if(length(dim(mx0)) > 0) mx0 <- drop(as.matrix(mx0)) 
@@ -75,7 +75,7 @@ pmd <- function(e0, mx0, sex = c("male", "female"), nx = 5, interp.rho = FALSE,
     e0l <- list(e0)
     names(mx0l) <- names(e0l) <- sex
     res <- .do.copmd(e0l, mx0l, rho = rho, npred = npred, nx = nx, kranges = kranges,
-                     keep.lt = keep.lt)
+                     keep.lt = keep.lt, ...)
     if(keep.rho)
         res[[sex]]$rho <- rho
     return(res[[sex]])
@@ -117,7 +117,8 @@ pmd <- function(e0, mx0, sex = c("male", "female"), nx = 5, interp.rho = FALSE,
 }
 
 .do.copmd <- function(e0l, mx0l, rho, npred, nx = 5, kranges = c(0, 25), keep.lt = FALSE, 
-                      sexratio.adjust = FALSE, adjust.sr.if.needed = FALSE, adjust.with.mxf = FALSE) {
+                      sexratio.adjust = FALSE, adjust.sr.if.needed = FALSE, 
+                      adjust.with.mxf = FALSE, a0rule = c("ak", "cd")) {
     # e0l and mx0l should be named lists of e0 and mx0 arrays with names being male and/or female. 
     # PMD is performed on all elements of the list using the same rho
     sexes <- c("female", "male")
@@ -135,6 +136,7 @@ pmd <- function(e0, mx0, sex = c("male", "female"), nx = 5, interp.rho = FALSE,
         resnage <-  nage # all ages
         age.groups <- default.ages
     }
+    a0cat <- list(ak = 1, cd = 2)[[match.arg(a0rule)]]
     # initialize results
     zeromatsr <- matrix(0, nrow=resnage, ncol=npred)
     zeromatmx <- matrix(0, nrow=nage, ncol=npred)
@@ -152,7 +154,7 @@ pmd <- function(e0, mx0, sex = c("male", "female"), nx = 5, interp.rho = FALSE,
                  as.numeric(mx0l[[sex]]), as.numeric(rho), as.numeric(e0l[[sex]]), 
                  Kl=as.numeric(kranges[1]), Ku=as.numeric(kranges[2]), 
                  Constr = constraint, Nconstr = as.integer(nconstr), ConstrIfNeeded = as.integer(adjust.sr.if.needed == TRUE && sex == "male"),
-                 FMx = as.numeric(result$female$mx), SRini = sex.ratio.ini,
+                 FMx = as.numeric(result$female$mx), SRini = sex.ratio.ini, a0rule = as.integer(a0cat),
                  LLm = as.numeric(result[[sex]]$Lx), Sr=as.numeric(result[[sex]]$sr), 
                  lx=as.numeric(result[[sex]]$lx), Mx=as.numeric(result[[sex]]$mx))
         ages <- names(mx0l[[sex]])
@@ -375,7 +377,7 @@ mltj <- function(e0m, e0f, ...) {
 #'      (i.e. reflects child mortality), 
 #'      and \eqn{k} should be chosen to match 45q15 (adult mortality) or set to 0 (default). The coefficients
 #'      can be passed as inputs, or taken from the package default dataset \code{\link{LQcoef}} which 
-#'      are taken from \url{http://www.demog.berkeley.edu/~jrw/LogQuad}.
+#'      are taken from \url{https://u.demog.berkeley.edu/~jrw/LogQuad/}.
 #'      
 #'      For the given inputs and values of life expectancy e0, the function finds values of \eqn{h} that 
 #'      best match e0, using life tables and the bisection method. It returns the corresponding mortality schedule
@@ -392,6 +394,7 @@ mltj <- function(e0m, e0f, ...) {
 #' @param k Value of the \eqn{k} parameter.
 #' @param keep.lt Logical. If \code{TRUE} additional life table columns are kept in the 
 #'      resulting object.
+#' @param \dots Additional life table arguments.
 #' @return Function \code{logquad} returns a list with the following elements: a matrix \code{mx}
 #'     with the predicted mortality rates. If \code{keep.lt} is \code{TRUE}, it also 
 #'     contains matrices \code{sr} (survival rates), and life table quantities \code{Lx} and \code{lx}.
@@ -419,7 +422,9 @@ mltj <- function(e0m, e0f, ...) {
 #' @rdname lqgroup
 #' @name logquad
 logquad <- function(e0, sex = c("male", "female", "total"), my.coefs = NULL,
-                    q5ranges = c(1e-4, 0.9), k = 0, keep.lt = FALSE) {
+                    q5ranges = c(1e-4, 0.9), k = 0, keep.lt = FALSE, ...) {
+    get.a0rule <- function(a0rule = c("ak", "cd"), ...)
+        list(ak = 1, cd = 2)[[match.arg(a0rule)]]
     sex <- match.arg(sex)
     sex.code <- list(male=1, female=2, total=3)[[sex]]
     if(is.null(my.coefs)) {
@@ -435,7 +440,8 @@ logquad <- function(e0, sex = c("male", "female", "total"), my.coefs = NULL,
     nage <- nrow(sex.coefs)
     npred <- length(e0)
     ages <- c(0, 1, seq(5, length = nage - 2, by = 5))
-
+    a0cat <- get.a0rule(...)
+    
     # initialize results
     zeromatsr <- matrix(0, nrow=nage-1, ncol=npred)
     zeromatmx <- matrix(0, nrow=nage, ncol=npred)
@@ -446,8 +452,8 @@ logquad <- function(e0, sex = c("male", "female", "total"), my.coefs = NULL,
                  as.numeric(sex.coefs$ax), as.numeric(sex.coefs$bx),
                  as.numeric(sex.coefs$cx), as.numeric(sex.coefs$vx),
                  Q5l=as.numeric(q5ranges[1]), Q5u=as.numeric(q5ranges[2]), 
-                 K = as.numeric(k), LLm = as.numeric(result$Lx), 
-                 Sr=as.numeric(result$sr), 
+                 K = as.numeric(k), a0rule = as.integer(a0cat),
+                 LLm = as.numeric(result$Lx), Sr=as.numeric(result$sr), 
                  lx=as.numeric(result$lx), Mx=as.numeric(result$mx))
     
     result$mx <- matrix(LQres$Mx, nrow=nage, dimnames=list(ages, names(e0)))
@@ -494,7 +500,7 @@ logquadj <- function(e0m, e0f, ...) {
 
 #' @title Mortality Prediction by Method Blending
 #' @description Predict age-specific mortality rates using a blend of two different methods (Coherent Lee-Carter, 
-#'     Coherent Pattern Mortality Decline, or Model Life Tables). Weights can be applied to fine-tune the blending mix.
+#'     Coherent Pattern Mortality Decline, Log-Quadratic model, or Model Life Tables). Weights can be applied to fine-tune the blending mix.
 #' @details The function allows to combine two different methods using given weights.
 #'     The weights can change over time - by default they are interpolated from the starting weight 
 #'     to the end weight. The projection is done for both sexes, so that coherent methods can be applied.
@@ -503,7 +509,8 @@ logquadj <- function(e0m, e0f, ...) {
 #' @param meth1 Character string giving the name of the first method to blend. It is one of 
 #'     \dQuote{lc}, \dQuote{pmd}, \dQuote{mlt} or \dQuote{logquad}, corresponding to Coherent Lee-Carter (function \code{\link{mortcast}}), 
 #'      Pattern Mortality Decline (function \code{\link{copmd}}), Log-Quadratic model (function \code{\link{logquadj}}), and 
-#'      Model Life Tables (function \code{\link{mltj}}), respectively.
+#'      Model Life Tables (function \code{\link{mltj}}), respectively. The \dQuote{logquad} method can only be used 
+#'      with 5-year age groups.
 #' @param meth2 Character string giving the name of the second method to blend. 
 #'     One of the same choices as \code{meth1}.
 #' @param weights Numeric vector with values between 0 and 1 giving the weight of \code{meth1}.
@@ -515,9 +522,11 @@ logquadj <- function(e0m, e0f, ...) {
 #'     \code{min.age.groups} age categories, the coherent Kannisto method (\code{\link{cokannisto}}) 
 #'     is applied to extend the age groups into old ages.
 #' @param min.age.groups Minimum number of age groups. Triggers the application of Kannisto, see above. 
+#'     Change the default value if 1-year age groups are used (see Example).
 #' @param meth1.args List of arguments passed to the function that corresponds to \code{meth1}. 
 #' @param meth2.args List of arguments passed to the function that corresponds to \code{meth2}. 
 #' @param kannisto.args List of arguments passed to the \code{\link{cokannisto}} function if Kannisto is applied. 
+#'     If 1-year age groups are used various defaults in the Kannisto function need to be changed (see Example).
 #' @return List with elements \code{female} and \code{male}, each of which contains a matrix \code{mx}
 #'     with the predicted mortality rates. In addition, it contains elements \code{meth1res} and \code{meth2res}
 #'     which contain the results of the functions corresponding to the two methods. 
@@ -539,15 +548,18 @@ logquadj <- function(e0m, e0f, ...) {
 #' # project into future
 #' e0f <- subset(e0Fproj, name == country)[-(1:2)]
 #' e0m <- subset(e0Mproj, name == country)[-(1:2)]
+#' 
 #' # Blend LC and MLT
 #' pred1 <- mortcast.blend(e0m, e0f, meth1 = "lc", meth2 = "mlt",
 #'     meth1.args = list(lc.pars = lcest),
 #'     meth2.args = list(type = "CD_North"),
 #'     weights = c(1,0.25))
+#'     
 #' # Blend PMD and MLT
 #' pred2 <- mortcast.blend(e0m, e0f, meth1 = "pmd", meth2 = "mlt",
 #'     meth1.args = list(mxm0 = mxm[, "2010-2015"],
 #'                       mxf0 = mxf[, "2010-2015"]))
+#'                       
 #' # plot projection by time
 #' plotmx <- function(pred, iage, main) 
 #'     with(pred, {
@@ -565,6 +577,28 @@ logquadj <- function(e0m, e0f, ...) {
 #' par(mfrow=c(1,2))
 #' plotmx(pred1, age.group, "LC-MLT (age 5-9)")
 #' plotmx(pred2, age.group, "PMD-MLT (age 5-9)")
+#' 
+#' # Blend LC and MLT for 1-year age groups
+#' #########################################
+#' # First interpolate e0 to get 1-year life expectancies (for first five years)
+#' e0m1y <- approx(as.double(e0m[,1:2]), n = 5)$y
+#' e0f1y <- approx(as.double(e0f[,1:2]), n = 5)$y
+#' # derive toy mx in order to get some LC parameters
+#' mxm1y <- mlt(seq(70, 72, length = 4), sex = "male", nx = 1)
+#' mxf1y <- mlt(seq(78, 79, length = 4), sex = "female", nx = 1)
+#' lcest1y <- lileecarter.estimate(mxm1y, mxf1y, nx = 1)
+#' 
+#' # projections
+#' pred3 <- mortcast.blend(e0m1y, e0f1y, meth1 = "lc", meth2 = "mlt",
+#'     weights = c(1,0.25), min.age.groups = 131,
+#'     meth1.args = list(lc.pars = lcest1y),
+#'     meth2.args = list(nx = 1),
+#'     kannisto.args = list(est.ages = 90:99, proj.ages = 100:130))
+#'     
+#' # plot results
+#' par(mfrow=c(1,1))
+#' plot(0:130, pred3$female$mx[,5], log = "y", type = "l", col = "red")
+#' lines(0:130, pred3$male$mx[,5], col = "blue")
 #' 
 #' @name mortcast.blend
 mortcast.blend <- function(e0m, e0f, 

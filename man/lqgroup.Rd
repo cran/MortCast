@@ -11,7 +11,8 @@ logquad(
   my.coefs = NULL,
   q5ranges = c(1e-04, 0.9),
   k = 0,
-  keep.lt = FALSE
+  keep.lt = FALSE,
+  ...
 )
 
 logquadj(e0m, e0f, ...)
@@ -33,11 +34,11 @@ Any \code{NA}s are internally converted to zeros. If not given, the dataset \cod
 \item{keep.lt}{Logical. If \code{TRUE} additional life table columns are kept in the 
 resulting object.}
 
+\item{\dots}{Additional arguments passed to the underlying function.}
+
 \item{e0m}{A time series of target male life expectancy.}
 
 \item{e0f}{A time series of target female life expectancy.}
-
-\item{\dots}{Additional arguments passed to the underlying function.}
 }
 \value{
 Function \code{logquad} returns a list with the following elements: a matrix \code{mx}
@@ -55,7 +56,7 @@ The LogQuad method in this implementation projects mortality rates using the equ
      (i.e. reflects child mortality), 
      and \eqn{k} should be chosen to match 45q15 (adult mortality) or set to 0 (default). The coefficients
      can be passed as inputs, or taken from the package default dataset \code{\link{LQcoef}} which 
-     are taken from \url{http://www.demog.berkeley.edu/~jrw/LogQuad}.
+     are taken from \url{https://u.demog.berkeley.edu/~jrw/LogQuad/}.
      
      For the given inputs and values of life expectancy e0, the function finds values of \eqn{h} that 
      best match e0, using life tables and the bisection method. It returns the corresponding mortality schedule

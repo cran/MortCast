@@ -38,6 +38,7 @@
 #' 
 leecarter.estimate <- function(mx, ax.index = NULL, ax.smooth = FALSE, 
                                bx.postprocess = TRUE, nx = 5) {
+    if(length(dim(mx)) < 2 || ncol(mx) < 2) stop("mx must be a matrix (age x time) of at least two columns.")
     lmx <- log(mx)
     if(length(dim(lmx))==0)
         lmx <- as.matrix(lmx)
@@ -241,6 +242,7 @@ ultimate.bx <- function(bx) {
 #' @param constrain.all.ages By default the method constrains the male mortality to be above female 
 #'     mortality for old ages if the male life expectancy is below the female life expectancy. Setting 
 #'     this argument to \code{TRUE} causes this constraint to be applied to all ages.
+#' @param \dots Additional life table arguments.
 #' @return List with elements \code{female} and \code{male}, each of which contains a matrix \code{mx}
 #'     with the predicted mortality rates. If \code{keep.lt} is \code{TRUE}, it also 
 #'     contains matrices \code{sr} (survival rates), and life table quantities \code{Lx} and \code{lx}.
@@ -277,27 +279,26 @@ ultimate.bx <- function(bx) {
 #' for(i in 2:ncol(pred$female$mx)) lines(lc$ages, pred$female$mx[,i], col="grey")
 #'
 #' # similarly for 1-year age groups
-#' # interpolate to get toy 1-year mx for estimation
-#' interp <- function(x)
-#'     approx(c(0,1, seq(5, 100, by=5)), x, xout = seq(0, 100), method = "linear")$y
-#' mxm1y <- apply(mxm, 2, interp)
-#' mxf1y <- apply(mxf, 2, interp)
-#' rownames(mxm1y) <- rownames(mxf1y) <- seq(0, 100)
+#' # derive toy 1-year mx using model life tables at given level of e0
+#' mxm1y <- mlt(seq(65, 71, length = 4), sex = "male", nx = 1)
+#' mxf1y <- mlt(seq(73, 78, length = 4), sex = "female", nx = 1)
 #' 
 #' # estimate parameters
 #' lc1y <- lileecarter.estimate(mxm1y, mxf1y, nx = 1)
 #'  
-#' # project into future 
+#' # project into the future 
 #' pred1y <- mortcast(e0m, e0f, lc1y)
 #' 
 #' # plot first projection in black and the remaining ones in grey 
 #' plot(lc1y$ages, pred1y$female$mx[,1], type="b", log="y", ylim=range(pred1y$female$mx),
-#'     ylab="female mx", xlab="Age", main=paste(country, "(1-year age groups)"), cex=0.5)
+#'     ylab="female mx", xlab="Age", main="1-year age groups", cex=0.5)
 #' for(i in 2:ncol(pred1y$female$mx)) lines(lc1y$ages, pred1y$female$mx[,i], col="grey")
 #' 
 
 mortcast <- function (e0m, e0f, lc.pars, rotate = TRUE, keep.lt = FALSE, 
-                      constrain.all.ages = FALSE) {
+                      constrain.all.ages = FALSE, ...) {
+    get.a0rule <- function(a0rule = c("ak", "cd"), ...)
+        list(ak = 1, cd = 2)[[match.arg(a0rule)]]
     # if e0 is a data.frame, convert to vector (it would not drop dimension without as.matrix)
     if(length(dim(e0m)) > 0) e0m <- drop(as.matrix(e0m)) 
     if(length(dim(e0f)) > 0) e0f <- drop(as.matrix(e0f)) 
@@ -313,6 +314,7 @@ mortcast <- function (e0m, e0f, lc.pars, rotate = TRUE, keep.lt = FALSE,
         resnage <-  nage # all ages
         age.groups <- lc.pars$ages
     }
+    a0cat <- get.a0rule(...)
     zeromatsr <- matrix(0, nrow=resnage, ncol=npred)
     zeromatmx <- matrix(0, nrow=nage, ncol=npred)
     # in an abridged case, lx, Lx and sr will be returned for 5-year intervals
@@ -339,7 +341,7 @@ mortcast <- function (e0m, e0f, lc.pars, rotate = TRUE, keep.lt = FALSE,
                   Kl=as.numeric(kranges[[sex]]$kl), Ku=as.numeric(kranges[[sex]]$ku), 
                   # 1 for constraining old ages only; 2 for constraining all ages
                   constrain=as.integer((sex == "male") * ((sex == "male") + (constrain.all.ages == TRUE))), 
-                  FMx=as.numeric(result$female$mx), FEop=as.numeric(e0$female),
+                  FMx=as.numeric(result$female$mx), FEop=as.numeric(e0$female), a0rule = as.integer(a0cat),
                   LLm = as.numeric(result[[sex]]$Lx), Sr=as.numeric(result[[sex]]$sr), 
                   lx=as.numeric(result[[sex]]$lx), Mx=as.numeric(result[[sex]]$mx))
         result[[sex]]$mx <- matrix(LCres$Mx, nrow=nage, 

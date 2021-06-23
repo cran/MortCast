@@ -6,10 +6,12 @@
 \alias{RhoFemales}
 \alias{RhoMales}
 \title{Pattern Mortality Decline Lookup Tables}
-\format{Using \code{data(PMDrho)} loads two objects into memory: \code{RhoFemales} and
+\format{
+Using \code{data(PMDrho)} loads two objects into memory: \code{RhoFemales} and
     \code{RhoMales}. They both are data frames with 22 rows corresponding to age groups, 
     and 17 columns corresponding to different levels of life expectancy in 5-years intervals 
-    (from 50 to 135). The names of the columns reflect the middle of the respective interval.}
+    (from 50 to 135). The names of the columns reflect the middle of the respective interval.
+}
 \usage{
 data(PMDrho)
 }
@@ -33,7 +35,7 @@ legend("bottomleft", legend = e0lev, lty = 1:length(e0lev), bty= "n")
 }
 \references{
 Andreev, K. Gu, D., Gerland, P. (2013). Age Patterns of Mortality Improvement by Level of Life Expectancy at Birth with Applications to Mortality Projections. Paper presented at the Annual Meeting
-of the Population Association of America, New Orleans, LA. \url{http://paa2013.princeton.edu/papers/132554}.
+of the Population Association of America, New Orleans, LA. \url{https://paa2013.princeton.edu/papers/132554}.
 
 Gu, D., Pelletier, F. and Sawyer, C. (2017). Projecting Age-sex-specific Mortality: A Comparison of the Modified Lee-Carter and Pattern of Mortality Decline Methods, UN Population Division, 
 Technical Paper No. 6. New York: United Nations. \url{https://population.un.org/wpp/Publications/Files/WPP2017_TechnicalPaperNo6.pdf}
