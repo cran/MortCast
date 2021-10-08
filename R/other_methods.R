@@ -156,11 +156,12 @@ pmd <- function(e0, mx0, sex = c("male", "female"), nx = 5, interp.rho = FALSE,
                  Constr = constraint, Nconstr = as.integer(nconstr), ConstrIfNeeded = as.integer(adjust.sr.if.needed == TRUE && sex == "male"),
                  FMx = as.numeric(result$female$mx), SRini = sex.ratio.ini, a0rule = as.integer(a0cat),
                  LLm = as.numeric(result[[sex]]$Lx), Sr=as.numeric(result[[sex]]$sr), 
-                 lx=as.numeric(result[[sex]]$lx), Mx=as.numeric(result[[sex]]$mx))
+                 lx=as.numeric(result[[sex]]$lx), Mx=as.numeric(result[[sex]]$mx), PACKAGE = "MortCast")
         ages <- names(mx0l[[sex]])
         if(is.null(ages)) ages <- default.ages
         result[[sex]]$mx <- matrix(PMDres$Mx, nrow=nage, 
                                    dimnames=list(ages, names(e0l[[sex]])))
+        result[[sex]]$nx <- nx
         if(keep.lt) {
             result[[sex]]$sr <- matrix(PMDres$Sr, nrow=resnage, dimnames=list(age.groups, names(e0l[[sex]])))
             result[[sex]]$Lx <- matrix(PMDres$LLm, nrow=resnage, dimnames=list(age.groups, names(e0l[[sex]])))
@@ -272,6 +273,7 @@ copmd <- function(e0m, e0f, mxm0, mxf0, nx = 5, interp.rho = FALSE, keep.rho = F
 #' \dQuote{CD_South}, \dQuote{CD_West}, \dQuote{UN_Chilean}, \dQuote{UN_Far_Eastern}, 
 #' \dQuote{UN_General}, \dQuote{UN_Latin_American}, \dQuote{UN_South_Asian}. 
 #' @param nx Size of age groups. Should be either 5 or 1.
+#' @param \dots Not used.
 #' @return Function \code{mlt} returns a matrix with the predicted mortality rates. Columns correspond 
 #'     to the values in the \code{e0} vector and rows correspond to age groups. 
 #'     Function \code{mltj} returns a list of such matrices, one for each sex.
@@ -307,7 +309,7 @@ copmd <- function(e0m, e0f, mxm0, mxf0, nx = 5, interp.rho = FALSE, keep.rho = F
 #'     
 #' @rdname mltgroup
 
-mlt <- function(e0, sex = c("male", "female"), type = "CD_West", nx = 5) {
+mlt <- function(e0, sex = c("male", "female"), type = "CD_West", nx = 5, ...) {
     sex <- match.arg(sex)
     sexcode <- c(female=2, male=1)[sex]
     if(length(dim(e0)) > 0) e0 <- drop(as.matrix(e0)) # if it's a data.frame, it would not drop dimension without as.matrix
@@ -358,13 +360,15 @@ mlt <- function(e0, sex = c("male", "female"), type = "CD_West", nx = 5) {
 #' @param e0f A time series of target female life expectancy.
 #' @param \dots Additional arguments passed to the underlying function. 
 #' 
-mltj <- function(e0m, e0f, ...) {
+mltj <- function(e0m, e0f, ..., nx = 5) {
     e0  <- list(female=e0f, male=e0m)
     res <- list()
     for(sex in names(e0)) {
         res[[sex]] <- list()
-        if(!is.null(e0[[sex]]))
-            res[[sex]]$mx <- mlt(e0 = e0[[sex]], sex = sex, ...)
+        if(!is.null(e0[[sex]])) {
+            res[[sex]]$mx <- mlt(e0 = e0[[sex]], sex = sex, ..., nx = nx)
+            res[[sex]]$nx <- nx
+        }
     }
     return(res)
 }
@@ -445,7 +449,7 @@ logquad <- function(e0, sex = c("male", "female", "total"), my.coefs = NULL,
     # initialize results
     zeromatsr <- matrix(0, nrow=nage-1, ncol=npred)
     zeromatmx <- matrix(0, nrow=nage, ncol=npred)
-    result <- list(mx=zeromatmx, lx=zeromatmx, sr=zeromatsr, Lx=zeromatsr)
+    result <- list(mx=zeromatmx, lx=zeromatmx, sr=zeromatsr, Lx=zeromatsr, nx = 5)
 
     LQres <- .C("LQuad", as.integer(npred), as.integer(sex.code), 
                  as.integer(nage), as.numeric(e0), 
@@ -454,7 +458,7 @@ logquad <- function(e0, sex = c("male", "female", "total"), my.coefs = NULL,
                  Q5l=as.numeric(q5ranges[1]), Q5u=as.numeric(q5ranges[2]), 
                  K = as.numeric(k), a0rule = as.integer(a0cat),
                  LLm = as.numeric(result$Lx), Sr=as.numeric(result$sr), 
-                 lx=as.numeric(result$lx), Mx=as.numeric(result$mx))
+                 lx=as.numeric(result$lx), Mx=as.numeric(result$mx), PACKAGE = "MortCast")
     
     result$mx <- matrix(LQres$Mx, nrow=nage, dimnames=list(ages, names(e0)))
     if(keep.lt) {
@@ -503,7 +507,9 @@ logquadj <- function(e0m, e0f, ...) {
 #'     Coherent Pattern Mortality Decline, Log-Quadratic model, or Model Life Tables). Weights can be applied to fine-tune the blending mix.
 #' @details The function allows to combine two different methods using given weights.
 #'     The weights can change over time - by default they are interpolated from the starting weight 
-#'     to the end weight. The projection is done for both sexes, so that coherent methods can be applied.
+#'     to the end weight. As the blended mortality rates do not necessarily match the target life expectancy, 
+#'     scaling is applied to improve the match, controlled by the \code{match.e0} argument. 
+#'     The projection is done for both sexes, so that coherent methods can be applied.
 #' @param e0m A time series of future male life expectancy.
 #' @param e0f A time series of future female life expectancy.
 #' @param meth1 Character string giving the name of the first method to blend. It is one of 
@@ -518,17 +524,25 @@ logquadj <- function(e0m, e0f, ...) {
 #'     If it is a vector of size two, it is assumed these are weights for the first and the last
 #'     time period. Remaining weights will be interpolated. Note that \code{meth2} is weighted 
 #'     by \code{1 - weights}.
+#' @param nx Size of age groups. Should be either 5 or 1.
 #' @param apply.kannisto Logical. If \code{TRUE} and if any of the methods results in less than 
 #'     \code{min.age.groups} age categories, the coherent Kannisto method (\code{\link{cokannisto}}) 
 #'     is applied to extend the age groups into old ages.
 #' @param min.age.groups Minimum number of age groups. Triggers the application of Kannisto, see above. 
 #'     Change the default value if 1-year age groups are used (see Example).
+#' @param match.e0 Logical. If \code{TRUE} the blended mx is scaled so that it matches the input e0.
+#' @param keep.lt Logical. If \code{TRUE} additional life table columns are kept in the 
+#'     resulting object. Only used if \code{match.e0} is \code{TRUE}.
 #' @param meth1.args List of arguments passed to the function that corresponds to \code{meth1}. 
 #' @param meth2.args List of arguments passed to the function that corresponds to \code{meth2}. 
 #' @param kannisto.args List of arguments passed to the \code{\link{cokannisto}} function if Kannisto is applied. 
 #'     If 1-year age groups are used various defaults in the Kannisto function need to be changed (see Example).
+#' @param \dots Additional life table arguments.
 #' @return List with elements \code{female} and \code{male}, each of which contains a matrix \code{mx}
-#'     with the predicted mortality rates. In addition, it contains elements \code{meth1res} and \code{meth2res}
+#'     with the predicted mortality rates. If the result has been scaled (\code{match.e0} is \code{TRUE}), the element 
+#'     \code{mx.rawblend} contains the mx before scaling. Also in such a case, if \code{keep.lt} is \code{TRUE}, it also 
+#'     contains matrices \code{sr} (survival rates), and life table quantities \code{Lx} and \code{lx}.
+#'     In addition, the return object contains elements \code{meth1res} and \code{meth2res}
 #'     which contain the results of the functions corresponding to the two methods. 
 #'     Elements \code{meth1} and \code{meth2} contain the names of the methods. 
 #'     A vector \code{weights} contains the final (possibly interpolated) weights.
@@ -590,9 +604,8 @@ logquadj <- function(e0m, e0f, ...) {
 #' 
 #' # projections
 #' pred3 <- mortcast.blend(e0m1y, e0f1y, meth1 = "lc", meth2 = "mlt",
-#'     weights = c(1,0.25), min.age.groups = 131,
+#'     weights = c(1,0.25), min.age.groups = 131, nx = 1, 
 #'     meth1.args = list(lc.pars = lcest1y),
-#'     meth2.args = list(nx = 1),
 #'     kannisto.args = list(est.ages = 90:99, proj.ages = 100:130))
 #'     
 #' # plot results
@@ -602,10 +615,13 @@ logquadj <- function(e0m, e0f, ...) {
 #' 
 #' @name mortcast.blend
 mortcast.blend <- function(e0m, e0f, 
-                          meth1 = "lc", meth2 = "mlt", weights = c(1, 0.5),
-                          apply.kannisto = TRUE, min.age.groups = 28,
-                          meth1.args = NULL, meth2.args = NULL, kannisto.args = NULL) {
-
+                          meth1 = "lc", meth2 = "mlt", weights = c(1, 0.5), nx = 5, 
+                          apply.kannisto = TRUE, min.age.groups = 28, 
+                          match.e0 = TRUE, keep.lt = FALSE, 
+                          meth1.args = NULL, meth2.args = NULL, kannisto.args = NULL, ...) {
+    get.a0rule <- function(a0rule = c("ak", "cd"), ...)
+        match.arg(a0rule)
+    
     methods.allowed <- list(lc = "mortcast", mlt = "mltj", pmd = "copmd", logquad = "logquadj")
     meth1 <- match.arg(meth1, choices = names(methods.allowed))
     meth2 <- match.arg(meth2, choices = names(methods.allowed))
@@ -615,8 +631,18 @@ mortcast.blend <- function(e0m, e0f,
     if(is.null(w)) w <- 0.5
     if(length(w) == 1) w <- rep(w, npred)
     if(!(length(w) == 2 || length(w) == npred))
-        stop("Weights should be either of length 1 (constant weight), 2 (interpolated etween start and end) or the same size as e0.")
+        stop("Weights should be either of length 1 (constant weight), 2 (interpolated between start and end) or the same size as e0.")
     if(any(w > 1 | w < 0)) stop("Weights must be between 0 and 1.")
+    
+    if(!nx %in% c(1, 5))
+        stop("The nx argument must be either 5 or 1.")
+    
+    a0rule <- get.a0rule(...)
+    a0cat <- list(ak = 1, cd = 2)[[a0rule]]
+    meth1.args[["nx"]] <- nx
+    meth2.args[["nx"]] <- nx
+    meth1.args[["a0rule"]] <- a0rule
+    meth2.args[["a0rule"]] <- a0rule
     
     mx1 <- do.call(methods.allowed[[meth1]], c(list(e0m, e0f), meth1.args))
     mx2 <- do.call(methods.allowed[[meth2]], c(list(e0m, e0f), meth2.args))
@@ -636,6 +662,44 @@ mortcast.blend <- function(e0m, e0f,
         if(is.null(wmat))
            wmat <- matrix(w, ncol = npred, nrow = nrow(mx1[[sex]]$mx), byrow = TRUE)
         res[[sex]] <- list(mx = wmat * mx1[[sex]]$mx + (1-wmat) * mx2[[sex]]$mx)
+    }
+    if(match.e0) {
+        e0l  <- list(female=e0f, male=e0m)
+        nage <- nrow(res[[sex]]$mx)
+        if(nx == 5) {
+            default.ages <- c(0, 1, seq(5, length = nage - 2, by = 5))
+            resnage <-  nage-1 # number of age groups of the resulting matrices 
+            age.groups <- default.ages[-2] # group 0-1 collapsed into 0-5
+        } else {
+            default.ages <- seq(0, nage - 1)
+            resnage <-  nage # all ages
+            age.groups <- default.ages
+        }
+        zeromatsr <- matrix(0, nrow=resnage, ncol=npred)
+        newmx <- res[[sex]]$mx
+        for(sex in names(res)) {
+            ressex <- list(lx=zeromatsr, sr=zeromatsr, Lx=zeromatsr)
+            adjres <- .C("adjust_mx", as.integer(npred), as.integer(c(female=2, male=1)[sex]), 
+                     as.integer(nage), as.integer(nx),
+                     as.numeric(res[[sex]]$mx), as.numeric(e0l[[sex]]), 
+                     a0rule = as.integer(a0cat),
+                     LLm = as.numeric(ressex$Lx), Sr=as.numeric(ressex$sr), 
+                     lx=as.numeric(ressex$lx), Mx=as.numeric(newmx), PACKAGE = "MortCast")
+            res[[sex]]$mx.rawblend <- res[[sex]]$mx
+            res[[sex]]$mx[] <- adjres$Mx
+            if(keep.lt) {
+                res[[sex]]$sr <- matrix(adjres$Sr, nrow=resnage,
+                                           dimnames=list(age.groups, names(e0l[[sex]])))
+                res[[sex]]$Lx <- matrix(adjres$LLm, nrow=resnage,
+                                           dimnames=list(age.groups, names(e0l[[sex]])))
+                res[[sex]]$lx <- matrix(adjres$lx, nrow=resnage, 
+                                           dimnames=list(age.groups, names(e0l[[sex]])))
+            } else {
+                res[[sex]]$sr <- NULL
+                res[[sex]]$Lx <- NULL
+                res[[sex]]$lx <- NULL
+            }
+        }
     }
     return(c(res, list(meth1res = mx1, meth2res = mx2, 
                        meth1 = meth1, meth2 = meth2, weights = w)))

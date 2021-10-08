@@ -1,3 +1,12 @@
+2.6-0 (10/08/2021)
+-----
+Modified the CD and UN life tables in datasets MLTlookup and MLT1Ylookup [provided by Sara Hertog, UN].
+
+2.5-0 (08/06/2021)
+-----
+Function mortcast.blend has an argument match.e0. If TRUE (default) the mx is scaled so that the 
+target e0 matches the input e0.
+
 2.4-0 (06/23/2021)
 -----
 Added a0rule argument to life table functions for computing a0. The default is now the Andreev-Kingkade method (instead of Coale-Demeany). [thanks to Tim Riffe and his DemoTools]

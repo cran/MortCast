@@ -267,7 +267,7 @@ void LTextraColumns(int nx, int nage, double *lx, double *Lx,
 }
 
 /*****************************************************************************
- * Wrapper for abridged life table function
+ * Abridged life table function
  *****************************************************************************/
 
 void LifeTableAbridged(int *sex, int *nage, double *mx, int *a0rule,
@@ -278,15 +278,26 @@ void LifeTableAbridged(int *sex, int *nage, double *mx, int *a0rule,
 }
 
 /*****************************************************************************
- * Wrapper for 1-year-age-groups life table function
+ * 1-year-age-groups life table function
  *****************************************************************************/
 
-void LifeTable(int *sex, int *nage, double *mx, int *a0rule,
+void LifeTableUnabridged(int *sex, int *nage, double *mx, int *a0rule,
                        double *Lx, double *lx, double *qx, double *ax, double *Tx, double *sx, double *dx) {
 
     doLifeTable1y(*sex, *nage, mx, *a0rule, Lx, lx, qx, ax);
     LTextraColumns(1, *nage, lx, Lx, dx, Tx, sx);
 }
+
+/*****************************************************************************
+ * Wrapper for life table with extra columns; nx determines if it is abridged or not
+ *****************************************************************************/
+
+void LifeTable(int *nx, int *sex, int *nage, double *mx, int *a0rule,
+                       double *Lx, double *lx, double *qx, double *ax, double *Tx, double *sx, double *dx) {
+    if(*nx > 1) LifeTableAbridged(sex, nage, mx, a0rule, Lx, lx, qx, ax, Tx, sx, dx);
+    else LifeTableUnabridged(sex, nage, mx, a0rule, Lx, lx, qx, ax, Tx, sx, dx);
+}
+
 
 /* Wrapper around doLifeTable1y 
  * Used when qx and ax is not needed.
@@ -526,22 +537,9 @@ void PMD(int *Npred, int *Sex, int *Nage, int *Nx, double *mx0, double *rho,
                             constr[i] = sr1[i] * fmx[i];
                     }
                 }
-                /*Rprintf("\nconstr: sex %i period %i: ", sex, pred);
-                for (i=0; i < nage; ++i) 
-                    Rprintf("%lf, ", constr[i]);
-                Rprintf("\nsr0: ");
-                for (i=0; i < nage; ++i) 
-                    Rprintf("%lf, ", sr0[i]);
-                Rprintf("\nsr1: ");
-                for (i=0; i < nage; ++i) 
-                    Rprintf("%lf, ", sr1[i]);
-                Rprintf("\nfmx: ");
-                for (i=0; i < nage; ++i) 
-                    Rprintf("%lf, ", fmx[i]);*/
             }
         }
 
-        
         /*Rprintf("\n%i: eop=%lf", pred, eop);*/
         LCEoKtC(sex, nage, nx, locmx, locrho, eop, Kl[0], Ku[0], constr, *a0rule, Lm, lm, mxm);		
         get_sx(Lm, sx, nagem1, nagem1, nx);
@@ -669,6 +667,83 @@ void LQuad(int *Npred, int *Sex, int *Nage, double *Eop,
         lx[nagem1 + pred*nage] = lm[nagem1];
         for (i=0; i < nage-2; ++i) {
             LLm[i + pred*(nagem1)] = Lm[i];
+        }
+    }
+}
+
+/*****************************************************************************
+ * adjust_mx model
+ * Adjust projection of age-specific mortality rates from mortcast.blend 
+ * to match input e0
+ * 
+ *****************************************************************************/
+void adjust_mx(int *Npred, int *Sex, int *Nage, int *Nx, double *mx0, 
+         double *Eop, int *a0rule,
+         double *LLm, double *Sr, double *lx, double *Mx) {
+    double eop, eopn, eopp, mxm[*Nage], mxp[*Nage];
+    int i, j, sex, npred, pred, nage, nagem1, nx;
+    double scale, scalep, new_scale, f, fp;
+    
+    npred = *Npred;
+    sex=*Sex;
+    nage=*Nage;
+    nx = *Nx;
+    
+    if(nx == 1) nagem1 = nage;
+    else nagem1 = nage-1;
+
+    double sx[nagem1], Lm[nagem1], lm[nagem1];
+        
+    for (pred=0; pred < npred; ++pred) {
+        eop = Eop[pred]; /* target e0 */
+        scale = 1.0; /* initial scaling factor */
+        eopp = 0;    /* previous e0 */
+        fp = 99999; /* previous convergence criterion */
+        for (i=0; i < nage; ++i) {
+            mxm[i] = mx0[i + pred*nage];
+        }
+        for(j = 0; j < 20; j++) {
+            LTforLC(sex, nagem1, nx, mxm, *a0rule, Lm, lm);
+            eopn = sum(Lm, nagem1); /* current e0 */ 
+            f = fabs(eopn - eop)/eop; /* convergence criterion */
+            if (f < 0.000005 || eopn == eopp) break;
+            if(j > 0 && f > fp) { /* if results worse, revert to the previous values and end the loop */
+                for (i=0; i < nage; ++i) {
+                    mxm[i] = mxp[i];
+                }
+                LTforLC(sex, nagem1, nx, mxm, *a0rule, Lm, lm);
+                eopn = sum(Lm, nagem1);
+                break;
+            }
+            if(j == 0) {
+                new_scale = eopn/eop;
+            } else {
+                new_scale = scale - (eopn - eop)*(scale - scalep)/(eopn - eopp);
+            }
+            scalep = scale;
+            scale = new_scale;
+            eopp = eopn;
+            fp = f;
+
+            for (i=0; i < nage; ++i) {
+                mxp[i] = mxm[i];
+                mxm[i] = scale * mxm[i];
+            }
+            
+        }
+        /*Rprintf("\n%i: loops = %i, eop=%lf, eopf=%lf, scale=%lf", pred, j, eop, eopn, scale);*/
+        get_sx(Lm, sx, nagem1, nagem1, nx);
+        
+        for (i=0; i < nagem1; ++i) {
+            Sr[i + pred*nagem1] = sx[i];
+            Mx[i + pred*nage] = mxm[i];
+            lx[i + pred*nagem1] = lm[i];
+            LLm[i + pred*nagem1] = Lm[i];
+            /*Rprintf("\ni=%i: LLm=%lf, Sr=%lf Mx=%lf Lm=%e", i, LLm[i + pred*nagem1], Sr[i + pred*nagem1], Mx[i + pred*nage], Lm[i]);*/
+        }
+        if(nx > 1) {
+            Mx[nagem1 + pred*nage] = mxm[nagem1]; /* for nx=5, mx has one age group more than the rest */
+            /*Rprintf("\ni=%i: Mx=%lf", Mx[nagem1 + pred*nage]);*/
         }
     }
 }
