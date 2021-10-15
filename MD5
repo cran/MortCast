@@ -1,5 +1,5 @@
-895158756a8d7432a7477aca1385e1b0 *ChangeLog
-7f45eae3d159a47c315abd7ee7fcb4f5 *DESCRIPTION
+99814511ba275a31db7d6941dba935a0 *ChangeLog
+f844fc68a0038d3436dbe471a5a0d516 *DESCRIPTION
 691f0dc993c3e19d0fda23a0aef687b0 *NAMESPACE
 3d501ef73bc4517165d460e3bbb1fb54 *R/LC.R
 c3d80e678c7b38bcd862c7b759ada9c0 *R/MortCast-data.R
@@ -7,10 +7,10 @@ ba25b68ba8fe98ccb72e3994458eec81 *R/MortCast.R
 50584e2b547df8e643119b967589ec62 *R/kannisto.R
 e64dd6e48c0cfb305330ae0df5e195d7 *R/life_table.R
 647e32a512f59998a4b4dbe2b2ceb996 *R/other_methods.R
-6449dcf3258ebf5f6d618f970b701c94 *build/partial.rdb
+b135fe7ec024493f061fc8f1743e9709 *build/partial.rdb
 b228414ddd5ab6171ebfecc60a1b367a *data/LQcoef.rda
-0db2670fc571a7372fe3cfd6c75076e7 *data/MLT1Ylookup.rda
-32ca1154eba0436dd234e93039447b67 *data/MLTlookup.rda
+41963c8a2ea8fff79197a779a37526f6 *data/MLT1Ylookup.rda
+c948ff84ed70c59cad28e19fd46b9612 *data/MLTlookup.rda
 1c6fc48d622433320c15565a7d29b988 *data/PMDadjcoef.rda
 a764bf97b58840d264e0bee95c106749 *data/PMDrho.rda
 4045d06ef49a9dea6f4ee7e7d32830b0 *man/LQcoef.Rd
